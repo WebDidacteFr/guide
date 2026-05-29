@@ -39,6 +39,18 @@ sections 3 → 8 de façon autonome, en t'arrêtant aux points **[DEMANDER]**.
 Pré-vérifs : `docker --version`, `docker compose version`, port **2283 libre**
 (`ss -tulpn | grep 2283`), disque (≈ 6 Go d'images + les photos), RAM ≥ ~4 Go (la ML est gourmande).
 
+### 2bis. Docker absent (machine vierge)  **[DEMANDER confirmation]**
+Ce guide part d'un hôte Docker existant. Si `docker --version` échoue, installer Docker d'abord
+(testé Debian/Ubuntu, script officiel) — opération système, **accord humain requis** :
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker "$USER"        # re-login requis ensuite
+sudo systemctl enable --now docker
+docker run --rm hello-world
+```
+> VM Proxmox neuve : créer la VM (image cloud Debian + cloud-init) puis ce bloc. Hors Debian/Ubuntu :
+> https://docs.docker.com/engine/install/ (éviter le `docker.io` trop ancien des distros).
+
 ## 3. Fichiers officiels (épinglés)
 ```bash
 mkdir -p "$INSTALL_DIR" && cd "$INSTALL_DIR"
@@ -72,11 +84,26 @@ Premier démarrage : import d'une base geodata (~224 k entrées) → délai norm
 - Derrière reverse proxy : remplacer `'2283:2283'` par `'127.0.0.1:2283:2283'` (service `immich-server`),
   puis `docker compose up -d` ; HTTPS + 2FA devant. Jamais 2283 nu sur Internet.
 
-## 7. Mise en service (UI)
-1. `http://<hôte>:2283` → « Bienvenue sur Immich » → **Commencer**.
-2. **Premier utilisateur = administrateur** : email + mot de passe fort + nom. **[DEMANDER]** les identifiants.
-3. Connexion + onboarding (thème, langue, vie privée, modèle de stockage, sauvegardes).
-4. Activer la **2FA** admin si l'instance est exposée.
+## 7. Création du compte admin (1er utilisateur = administrateur)
+**[DEMANDER]** email + mot de passe fort + nom.
+
+**Méthode A — API (recommandée pour un agent sans navigateur)** — vérifiée sur v2.7.x :
+```bash
+# Crée l'admin (uniquement tant qu'aucun admin n'existe ; sinon 400 "already has an admin")
+curl -fsS -X POST http://localhost:2283/api/auth/admin-sign-up \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<ADMIN_EMAIL>","password":"<ADMIN_PWD>","name":"<NOM>"}'
+# (Optionnel) token pour piloter le reste par API :
+curl -fsS -X POST http://localhost:2283/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<ADMIN_EMAIL>","password":"<ADMIN_PWD>"}'   # -> {"accessToken":"...","isAdmin":true,...}
+```
+> Si `400 {"message":"The server already has an admin"}` : l'admin existe déjà → passer à la connexion.
+
+**Méthode B — UI web (navigateur dispo / humain)** : `http://<hôte>:2283` → *Commencer* → formulaire admin
+→ connexion → onboarding (thème, langue, vie privée, modèle de stockage, sauvegardes).
+
+Dans les deux cas : activer la **2FA** admin si l'instance est exposée.
 
 ## 8. Test fonctionnel réel
 Uploader **une photo ET une vidéo** via l'UI, vérifier leur présence dans la timeline et leur

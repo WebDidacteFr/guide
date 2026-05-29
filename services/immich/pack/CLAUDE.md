@@ -38,6 +38,19 @@ Prérequis à vérifier : `docker --version`, `docker compose version`, **port 2
 (`ss -tulpn | grep 2283`), espace disque suffisant (images ≈ 6 Go + tes photos), RAM ≥ ~4 Go conseillée
 (la machine-learning est gourmande).
 
+### 2bis. Si Docker n'est PAS installé (machine vierge)  **[DEMANDER confirmation]**
+Ce guide suppose un hôte Docker existant. Si `docker --version` échoue, installe Docker d'abord
+(testé sur Debian/Ubuntu via le script officiel) — **opération système, demande l'accord de l'humain** :
+```bash
+curl -fsSL https://get.docker.com | sh          # installe Docker Engine + plugin compose
+sudo usermod -aG docker "$USER"                 # éviter sudo pour docker (re-login requis ensuite)
+sudo systemctl enable --now docker
+docker run --rm hello-world                      # vérif rapide
+```
+> Sur une **VM Proxmox** neuve : créer d'abord la VM (image cloud Debian + cloud-init), puis ce bloc.
+> Hors Debian/Ubuntu (Fedora, etc.) : suivre https://docs.docker.com/engine/install/ . Ne PAS utiliser
+> le `docker.io` trop ancien de certaines distros.
+
 ## 3. Récupérer les fichiers officiels (versions épinglées)
 ```bash
 mkdir -p "$INSTALL_DIR" && cd "$INSTALL_DIR"
@@ -73,11 +86,30 @@ Au 1er démarrage, le serveur importe une base geodata (~224 k entrées) → pat
   dans `docker-compose.yml`, service `immich-server`, remplacer `'2283:2283'` par `'127.0.0.1:2283:2283'`,
   puis `docker compose up -d`. Mettre HTTPS + 2FA devant. **Jamais** 2283 nu sur Internet.
 
-## 7. Mise en service (UI) — création de l'admin
-1. Ouvrir `http://<hôte>:2283` → « Bienvenue sur Immich » → **Commencer**.
-2. Le **1er utilisateur créé = administrateur**. Renseigner email + mot de passe fort + nom. **[DEMANDER]** les identifiants.
-3. Se connecter, dérouler l'onboarding (thème, langue, vie privée, modèle de stockage, sauvegardes).
-4. **Activer la 2FA** sur le compte admin (Paramètres) si l'instance est exposée.
+## 7. Création du compte admin (1er utilisateur = administrateur)
+Le **tout premier** compte créé devient administrateur. **[DEMANDER]** email + mot de passe fort + nom.
+
+**Méthode A — par API (recommandée pour un agent SANS navigateur)** — vérifiée sur v2.7.x :
+```bash
+# Crée l'admin (ne fonctionne QUE tant qu'aucun admin n'existe ; sinon -> 400 "already has an admin")
+curl -fsS -X POST http://localhost:2283/api/auth/admin-sign-up \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<ADMIN_EMAIL>","password":"<ADMIN_PWD>","name":"<NOM>"}'
+
+# (Optionnel) récupérer un token pour piloter le reste par API :
+curl -fsS -X POST http://localhost:2283/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<ADMIN_EMAIL>","password":"<ADMIN_PWD>"}'
+# -> JSON { "accessToken": "...", "isAdmin": true, ... }  (en-tête: Authorization: Bearer <accessToken>)
+```
+> Vérif idempotence : si la commande renvoie `400 {"message":"The server already has an admin"}`,
+> c'est que l'admin existe déjà — ne pas réessayer, passer à la connexion.
+
+**Méthode B — par l'UI web (si navigateur dispo / fait par l'humain)** :
+1. `http://<hôte>:2283` → « Bienvenue sur Immich » → **Commencer** → formulaire admin.
+2. Se connecter, dérouler l'onboarding (thème, langue, vie privée, modèle de stockage, sauvegardes).
+
+Dans les deux cas : **activer la 2FA** sur le compte admin (Paramètres) si l'instance est exposée.
 
 ## 8. Test fonctionnel réel (à faire, ne pas supposer)
 - Uploader **une photo ET une vidéo** depuis l'UI (bouton *Envoyer*). Vérifier qu'elles apparaissent
