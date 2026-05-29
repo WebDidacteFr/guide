@@ -82,6 +82,17 @@ Premier démarrage : import d'une base geodata (~224 k entrées) → délai norm
 Uploader **une photo ET une vidéo** via l'UI, vérifier leur présence dans la timeline et leur
 ouverture. Contrôle disque : `docker exec immich_server ls -laR /data/upload`.
 
+## 8bis. Appli mobile (LE cas d'usage : remplacer Google Photos) — testé sur Android réel
+Sauvegarde automatique des photos du téléphone (la vraie raison d'installer Immich).
+1. Installer l'appli **Immich** (Play Store / App Store / APK GitHub selon l'**ABI** du tel : `arm64-v8a`,
+   `armeabi-v7a` pour un 32-bit, ou l'APK universel `app-release.apk`).
+2. Saisir l'**URL serveur** (`http://<hôte>:2283` en LAN, **`https://…` via reverse proxy** hors domicile) → connexion.
+3. Autoriser l'accès photos → écran **Sauvegarde** : sélectionner **les albums voulus** (pas tout par défaut)
+   → activer l'interrupteur. Vérifier **Sauvegardé = Total**.
+4. Côté serveur, l'asset a un `deviceId` propre au téléphone (≠ `WEB`) et apparaît dans l'UI web.
+> ⚠️ Hors WiFi maison (4G/5G), la sauvegarde exige un serveur joignable de l'extérieur : reverse proxy
+> HTTPS + 2FA, ou VPN. Jamais le 2283 nu sur Internet (cf. `SECURITY.md`).
+
 ## 9. Sauvegarde / restauration / mise à jour
 - **Sauvegarde** : dump PostgreSQL + dossiers `upload/library/profile` (voir `BACKUP.md`). 3-2-1.
 - **Restauration** : voir `RESTORE.md`. ⚠️ Piège : sans `thumbs/`+`encoded-video/`+`backups/` dans le
