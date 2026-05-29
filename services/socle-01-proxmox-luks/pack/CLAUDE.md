@@ -110,11 +110,16 @@ cp /etc/hosts /etc/hosts.bak
 # Exemple : 192.168.1.50   pve.maison.lan pve
 hostname --ip-address    # doit renvoyer l'IP réelle (pas 127.x)
 
-# 5.2 — Dépôt Proxmox VE (Trixie) + clé GPG
-wget https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg \
-  -O /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
-echo "deb [arch=amd64] http://download.proxmox.com/debian/pve trixie pve-no-subscription" \
-  > /etc/apt/sources.list.d/pve-install-repo.list
+# 5.2 — Dépôt Proxmox VE (Trixie) + clé GPG, format deb822 officiel
+cat > /etc/apt/sources.list.d/pve-install-repo.sources <<'EOF'
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
+wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg \
+  -O /usr/share/keyrings/proxmox-archive-keyring.gpg
 apt update     # doit récupérer le dépôt 'pve' sans erreur GPG
 
 # 5.3 — Mise à niveau + noyau Proxmox
@@ -130,11 +135,15 @@ Reconnecte-toi en SSH, vérifie : `uname -r` doit contenir `-pve`.
 echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
 echo "postfix postfix/mailname string $FQDN" | debconf-set-selections
 DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::=--force-confold \
-  install proxmox-ve postfix open-iscsi
+  install proxmox-ve postfix open-iscsi chrony
 
-# 5.5 — Retirer le noyau Debian et os-prober (recommandé par Proxmox)
-apt -y remove os-prober linux-image-amd64
-update-grub
+# 5.5 — Retirer le noyau Debian (ÉTAPE OFFICIELLE Proxmox) + os-prober
+# ⚠️ `linux-image-amd64` n'est que le MÉTA-paquet. Il faut AUSSI retirer l'image versionnée
+# déjà installée (série 6.12.x sur Trixie), sinon le noyau Debian reste sur le disque ET dans
+# le menu GRUB — on veut ne booter QUE sur le noyau Proxmox (-pve).
+dpkg -l 'linux-image-*' | grep '^ii'        # repérer les noyaux installés (garder l'image *-pve)
+apt -y remove os-prober linux-image-amd64 'linux-image-6.12*'   # adapter 6.12* à ta série Debian
+update-grub                                  # GRUB ne doit plus lister QUE le noyau -pve
 pveversion       # doit afficher pve-manager/9.x
 ```
 

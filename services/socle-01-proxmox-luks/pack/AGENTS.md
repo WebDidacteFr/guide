@@ -89,11 +89,16 @@ cp /etc/hosts /etc/hosts.bak
 # Mettre :  <IP sans /CIDR>   <FQDN> <HOSTNAME>     (ex: 192.168.1.50 pve.maison.lan pve)
 hostname --ip-address     # doit renvoyer l'IP réelle
 
-# 5.2 Dépôt Proxmox VE (Trixie) + clé GPG
-wget https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg \
-  -O /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
-echo "deb [arch=amd64] http://download.proxmox.com/debian/pve trixie pve-no-subscription" \
-  > /etc/apt/sources.list.d/pve-install-repo.list
+# 5.2 Dépôt Proxmox VE (Trixie) + clé GPG, format deb822 officiel
+cat > /etc/apt/sources.list.d/pve-install-repo.sources <<'EOF'
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
+wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg \
+  -O /usr/share/keyrings/proxmox-archive-keyring.gpg
 apt update                # dépôt 'pve' sans erreur GPG
 
 # 5.3 Mise à niveau + noyau Proxmox
@@ -107,11 +112,14 @@ apt -y install proxmox-default-kernel
 echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
 echo "postfix postfix/mailname string $FQDN" | debconf-set-selections
 DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::=--force-confold \
-  install proxmox-ve postfix open-iscsi
+  install proxmox-ve postfix open-iscsi chrony
 
-# 5.5 Retirer le noyau Debian + os-prober
-apt -y remove os-prober linux-image-amd64
-update-grub ; pveversion        # pve-manager/9.x attendu
+# 5.5 Retirer le noyau Debian (ÉTAPE OFFICIELLE) + os-prober
+# ⚠️ `linux-image-amd64` = méta seul. Retirer AUSSI l'image versionnée (6.12* sur Trixie),
+# sinon le noyau Debian reste installé ET dans GRUB. But : ne booter QUE sur -pve.
+dpkg -l 'linux-image-*' | grep '^ii'                 # repérer (garder l'image *-pve)
+apt -y remove os-prober linux-image-amd64 'linux-image-6.12*'   # adapter 6.12* à ta série
+update-grub ; pveversion        # GRUB = que -pve ; pveversion = pve-manager/9.x
 ```
 
 ## 6. Phase B — Réseau statique sur bridge `vmbr0` (ÉTAPE CRITIQUE)
